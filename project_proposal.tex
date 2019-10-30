@@ -10,6 +10,8 @@
 
 \usepackage{jmlr2e}
 %\usepackage{parskip}
+\usepackage{natbib}
+
 
 % Definitions of handy macros can go here
 \newcommand{\dataset}{{\cal D}}
@@ -73,9 +75,9 @@ Please provide information for the following fields. Your proposal write-up shou
 
 \subsection{What is your proposed analysis? What are the likely outcomes?}
 
-\bold{Proposed Analysis:}  Can we build a model to predict whether or not a k-12 public school will close in a given school year using school characteristics including school size, class size, school demographics, and the demographics of the surrounding area from three years previous?
+Proposed Analysis: Can we build a model to predict whether or not a k-12 public school will close in a given school year using school characteristics including school size, class size, school demographics, and the demographics of the surrounding area from three years previous?
 
-\bold({Likely Outcome:} Our model should be able to produce either a probability or ordinal score that indicates the likelihood of a given school closing in three years. Hopefully, this model could be applied to each successive years to predict future closures.
+Likely Outcome: Our model should be able to produce either a probability or ordinal score that indicates the likelihood of a given school closing in three years. Hopefully, this model could be applied to each successive years to predict future closures.
 
 
 
@@ -83,11 +85,11 @@ Please provide information for the following fields. Your proposal write-up shou
 There is a large body of academic research describing the impact of school closures on educational outcomes and socioeconomic inequality. The literature suggests that school closures generally lead to a short-term decline in educational outcomes, even when students transferred to higher quality schools with more resources. If decision-makers were able to forecast closures ahead of time, resources could be devoted to mitigating the short-term costs of closures prior to closures occurring.
 
 
-\subsection{How will your analysis contribute to existing work? Provide references, \emph{e.g.}, see: \cite{cite1}.}
+\subsection{How will your analysis contribute to existing work? Provide references, \emph{e.g.}, see: \cite{cite1,cite2}}
 
-Several studies have examined the impact of school closures on educational outcomes in the short and long term. Engberg et al. (2012) study the restructuring of an urban school district that resulted in 20 school closures in an attempt to move students to better quality schools. They find that closures do lead to decreases in standardized test scores, but that students moving to higher quality schools are not significantly affected by the closure. 
+Several studies have examined the impact of school closures on educational outcomes in the short and long term. \cite{cite1} study the restructuring of an urban school district that resulted in 20 school closures in an attempt to move students to better quality schools. They find that closures do lead to decreases in standardized test scores, but that students moving to higher quality schools are not significantly affected by the closure. 
 
-Sacerdote (2012) looks at high school closures in Louisiana due to Hurricanes Katrina and Rita. Like the previous papers, he finds that relocated students do worse on standardized tests immediately after a closure but end up back on trend or better a few years later. 
+Sacerdote (2012) looks at high school closures in Louisiana due to Hurricanes Katrina and Rita. Like the previous papers, he finds that relocated students do worse on standardized tests immediately after a closure but end up back on trend or better a few years later. \cite{cite2}
 
 None of these studies examined the closure as an outcome and parents as the main stakeholders. The contribution of the analysis is to creating a novel tool for parents to use, so that they can make informed choices when they move to another area. 
 
@@ -116,7 +118,7 @@ Because the positive number of outcomes are small relative to the dataset, we ar
 
 \subsection{What study design, pre-processing, and machine learning methods do you intend to use? Justify that the analysis is of appropriate size for a course project.}
 
-We will need to look at potential measurement issues with the data collection, and if necessary, backwards correct identified mistakes using data from after 2013-2014. We will also need to employ a combination of theoretical consideration of the features included and statistical evaluation techniques such as principle component analysis since features may be highly correlated.
+We will need to look at potential measurement issues with the data collection, and if necessary, backwards correct identified mistakes using data from after 2013-2014. We will also need to which features make the most theoretical sense to include since many features will likely be highly correlated.
 
 Part of the pre-processing will involve joining the NCES data with Census ACS data. One option would be to join at the level of congressional district. However, this may be problematic as congressional districts are often deliberately chosen to decrease the representation of certain populations by grouping them within larger populations, which could lead to a large degree of within-district heterogeneity. A better option may be to join zip codes from the NCES with Zip Code Tabulation Areas (ZCTAs) in the census data. ZCTAs are meant to approximate zip codes should be accurate for almost all schools, but they do not exactly overlap with zip codes. 
 
@@ -133,18 +135,23 @@ Because our research question is not overly concerned with feature importance, w
 
 
 \subsection{What are possible limitations of the study?}
-\begin{itemize}
+
 Small outcome size (1500 closures in a year compared to 90,000 observations). It may be difficult to tune models to detect these rare occurrences and may complicate our ability to validate our models. To address this concern, we can take several measures including oversampling of closures in a given year. 
+
 Correlation of school closures.  We probably can’t assume our outcome variable is i.i.d.  For instance, if a city has a reduced budget, this may indicate multiple schools close within the year and they are not independent of each other. Also, if multiple schools in the same neighborhood close due to low enrollment and poor performance, it is possible to have a correlation among school closures. This will impact our interpretation of standard errors for interpretable model designs. 
-\end{itemize}
+
+
 \subsection{Who will use your analytic pipeline? In one or two sentences, describe an example of its use.}
 
-1.	Parents, who are homebuyers would be interested in knowing if the school in the area will close.
+1.	Parents, interested in impact on their child's performance as well as those who are homebuyers would be interested in knowing if the school in the area will close.
 2.	Non-Profits in the area may be interested in knowing which schools are likely to close.  Since school closure could be linked to economic downturn, they would want to be aware of future societal problems which are likely to occur, meaning they may need to focus more resources towards those areas.
 3.	Prospective teachers would be interested before accepting roles at the school.
 4.	If school closures are linked to economic depression, businesses interested in investing in the are may also be interested to know if schools are closing.
 
-\bibliography{sample.bib}
+\bibliography{probref.bib}
+
+
+
 %\appendix
 %\section*{Appendix A.}
 %Some more details about those methods, so we can actually reproduce them.
