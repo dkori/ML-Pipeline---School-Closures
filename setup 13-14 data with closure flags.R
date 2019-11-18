@@ -80,3 +80,4 @@ save(with_flags,file="2013-14 school data with closure flags.RData")
 # sum(with_flags$closed16_17)
 # sum(with_flags$closed17_18)
 # sum(with_flags$closed_any)/nrow(with_flags)
+#bla bla bla
