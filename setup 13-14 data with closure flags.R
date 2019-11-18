@@ -70,14 +70,25 @@ with_flags<-dat13_14%>%
          closed15_16=ifelse(NCESSCH %in% closed15_16$NCESSCH,1,0),
          closed16_17=ifelse(NCESSCH %in% closed16_17$NCESSCH,1,0),
          closed17_18=ifelse(NCESSCH %in% closed17_18$NCESSCH,1,0),
-         closed_any=ifelse(closed14_15+closed15_16+closed16_17+closed17_18>0,1,0))
-#save with flags as rdata
-save(with_flags,file="2013-14 school data with closure flags.RData")
+         closed_any=ifelse(closed14_15+closed15_16+closed16_17+closed17_18>0,1,0))%>%
+  mutate(STATUS%in%c(1,3))
 
-#check out flag counts
+
+
+# #save with flags as rdata
+# save(with_flags,file="2013-14 school data with closure flags.RData")
+# names(with_flags)
+# with_flags%>%
+#   group_by(MZIP)%>%
+#   summarise(closed_any=sum(closed_any))%>%
+#   arrange(desc(closed_any))
+# test_zip<-with_flags%>%
+#   filter(MZIP==78114)
+# summary(with_flags$FRELCH)
+
+# #check out flag counts
 # sum(with_flags$closed14_15)
 # sum(with_flags$closed15_16)
 # sum(with_flags$closed16_17)
 # sum(with_flags$closed17_18)
-# sum(with_flags$closed_any)/nrow(with_flags)
-#bla bla bla
+# sum(with_flags$closed_any)

@@ -1,0 +1,126 @@
+\documentclass[twoside,11pt]{article}
+
+% Any additional packages needed should be included after jmlr2e.
+% Note that jmlr2e.sty includes epsfig, amssymb, natbib and graphicx,
+% and defines many common macros, such as 'proof' and 'example'.
+%
+% It also sets the bibliographystyle to plainnat; for more information on
+% natbib citation styles, see the natbib documentation, a copy of which
+% is archived at http://www.jmlr.org/format/natbib.pdf
+
+\usepackage{jmlr2e}
+%\usepackage{parskip}
+\usepackage{natbib}
+
+
+% Definitions of handy macros can go here
+\newcommand{\dataset}{{\cal D}}
+\newcommand{\fracpartial}[2]{\frac{\partial #1}{\partial  #2}}
+% Heading arguments are {volume}{year}{pages}{submitted}{published}{author-full-names}
+
+% Short headings should be running head and authors last names
+\ShortHeadings{95-845: AAMLP Proposal}{Gootiiz, Kori, and Minor}
+\firstpageno{1}
+
+\begin{document}
+
+\title{Heinz 95-845: Project Proposal}
+
+\author{\name Shuree Gootiiz \email bgootiiz@andrew.cmu.edu \\
+       \addr Heinz College of Information Systems and Public Policy\\
+       Carnegie Mellon University\\
+       Pittsburgh, PA, United States \\
+       \AND
+       \name Devraj Kori \email dkori@andrew.cmu.edu \\
+       \addr Heinz College of Information Systems and Public Policy\\
+       Carnegie Mellon University\\
+       Pittsburgh, PA, United States
+       \AND
+       \name Katherine Minor \email kminor@andrew.cmu.edu \\
+       \addr Heinz College of Information Systems and Public Policy\\
+       Carnegie Mellon University\\
+       Pittsburgh, PA, United States}
+       
+\maketitle
+
+
+
+\section{Proposal Details (10 points)} \label{details}
+
+\subsection{What is your proposed analysis? What are the likely outcomes?}
+
+Proposed Analysis: We aim to build a model to predict whether or not a k-12 public school will close in a given school year using school characteristics including school size, class size, school demographics, and the demographics of the surrounding area from three years previous.
+
+Likely Outcome: Our model should be able to produce either a probability or ordinal score that indicates the likelihood of a given school closing within three years. Hopefully, this model could be applied to each successive years to predict future closures.
+
+
+\subsection{Why is your proposed analysis important?}
+The literature on school closures suggests that closures generally lead to a short-term decline in educational outcomes, even when students transferred to higher quality schools with more resources. If decision-makers were able to forecast closures ahead of time, resources could be devoted to mitigating the short-term costs of closures prior to closures occurring.
+
+\subsection{How will your analysis contribute to existing work? Provide references, \emph{e.g.}, see: \cite{cite1,cite2}}
+
+Many studies have examined the impact of school closures ex post.
+
+ \cite{cite1} study the restructuring of an urban school district that resulted in 20 school closures in an attempt to move students to better quality schools. They find that closures do lead to decreases in standardized test scores, but that students moving to higher quality schools are not significantly affected by the closure. 
+
+\cite{cite2} looks at high school closures in Louisiana due to Hurricanes Katrina and Rita. Like the previous papers, he finds that relocated students do worse on standardized tests immediately after a closure but end up back on trend or better a few years later. 
+
+None of the studies we found examined closures ex ante. The contribution of the analysis is to predicting school closures and creating a novel tool for parents and decision-makers to use.
+
+\subsection{Describe the data. Where applicable, please also define Y outcome(s), U treatment, V covariates, and W population.}
+
+The data comes from the National Center for Education Statistics universe survey of all K-12 public schools in the fifty states plus the District of Columbia. The population for our analysis will be all K-12 public schools in all states that were open and active during the 2013-2014 school year. 
+
+The outcome of interest will be whether or not the status of each school from the population is indicated to be "closed" in the 2017-2018 data.
+The treatments and covariates will mainly come from the school-level data in the 2013-2014 dataset. These include 
+\begin{itemize}
+\item whether the school is in an urban, rural, or suburban area
+\item the number of full-time equivalent teachers
+\item enrollment by grade-level, race, gender, and the number of students eligible for NSLP
+\item special statuses of schools such as magnet and charter schools, and schools administered by the Bureau of Indian Education
+\end{itemize}
+We should also be able to use Census data from the 2013 American Community Survey 5-year estimates such as median income and home value price information.
+
+\subsection{What evaluation measures are appropriate for the analysis? Which measures will you use?}
+
+We will have to understand trade-offs and costs in decision making:  Is it worse to falsely classify a school as closing when it is not, or is it worse to label a school which is likely to close as not closing?
+
+As the positive number of outcomes are small relative to the dataset, we are susceptible to having a model with low sensitivity and high specificity.  We could use a Bayes classifier to lower the threshold of labeling likely school closure using the posterior probability.  Determining this may be based on an ROC curve of true and false positive rates.  
+
+
+\subsection{What study design, pre-processing, and machine learning methods do you intend to use? Justify that the analysis is of appropriate size for a course project.}
+
+We will need to look at potential measurement issues with the data collection, and if necessary, backwards correct identified mistakes using data from after 2013-2014. We will also need to decide which features to include as many features will likely be correlated.
+
+Part of the pre-processing will involve joining the NCES data with Census ACS data. One option would be to join at the level of congressional district. However, congressional districts are often drawn to include distinct populations for political reasons, leading to within-district heterogeneity. A better option may be to join zip codes from the NCES with Zip Code Tabulation Areas (ZCTAs) in the census data. ZCTAs are meant to approximate zip codes should be accurate for almost all schools, but they do not exactly overlap with zip codes. 
+
+Our study design will consist of statistical models and learning methods to generate predictions on a training subset of the data, and to validate our results against a hold-out test subset. To account for the fact that positive outcomes are relatively rare in our dataset, we will oversample positive outcomes when generating our training data.
+
+As the research question is not overly concerned with feature importance, we plan to use models ranging from low to high interpretability. Given the time constraints of this project, we will limit our analysis to the following models:
+\begin{itemize}
+    \item Linear Discriminant Analysis
+    \item Random Forest
+    \item Generalized Additive Model for classification
+    \item Neural Net
+\end{itemize}
+
+\subsection{What are possible limitations of the study?}
+
+Small outcome size: (1500 closures in a year compared to 90,000 observations). It may be difficult to tune models to detect these rare occurrences and may complicate our ability to validate our models. To address this concern, we can take several measures including oversampling of closures in our training set.
+
+Correlation of school closures: We probably can’t assume our outcome variable is i.i.d.  For instance, if a city has a reduced budget, this may indicate multiple schools close within the year and they are not independent of each other. Also, if multiple schools in the same neighborhood close due to low enrollment and poor performance, it is possible to have a correlation among school closures. This will impact our interpretation of standard errors for interpretable model designs. 
+
+
+\subsection{Who will use your analytic pipeline? In one or two sentences, describe an example of its use.}
+Our analytic pipeline could be used by parents, potential homebuyers, policymakers, and non-profit organizations. For example, a non-profit focused on providing resources to disadvantaged students could use our tool to identify schools that may close and either provide resources to help students prepare for the disruption of a closure or lobby for better funding to prevent the closure. 
+
+
+\bibliography{probref.bib}
+
+
+
+%\appendix
+%\section*{Appendix A.}
+%Some more details about those methods, so we can actually reproduce them.
+
+\end{document}
