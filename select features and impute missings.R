@@ -2,14 +2,14 @@
 rm(list=ls())
 library(dplyr)
 library(tidyr)
-load("2013-14 school data with closure flags.RData")
-names(with_flags)
 
+load("2013-14 school data with closure flags.RData")
+#summary(for_modeling$zip)
 
 #select only variables we chose for model inclusion
-to_include<-c("zip" = "LZIP",
+to_include<-c("state" = "MSTATE",
               "school_type" = "TYPE",
-              "supervisory_union" = "UNION",
+              #"supervisory_union" = "UNION",
               "urban_locale_type" = "ULOCAL",
               #not including BIE schools because there are so few of them
               #bies = bies,
@@ -47,7 +47,9 @@ to_include<-c("zip" = "LZIP",
               "pacific_islander" = "PACIFIC",
               "multi_racial" = "TR",
               "nslp_status" = "NSLPSTATUS",
-              "closed14_15","closed15_16","closed16_17","closed17_18","closed_any")
+              "union" = "UNION",
+              #"closed14_15","closed15_16","closed16_17","closed17_18",
+              "closed_any")
 #limit just to needed features
 needed_features<-with_flags%>%
   #limit to relevant variables
@@ -78,12 +80,17 @@ for(var in names(needed_features)){
 
 #make categorical variables factors so R doesn't think they're continuous
 for_modeling<-needed_features%>%
-  mutate(zip=factor(zip),
+  mutate(state=factor(state),
        school_type=factor(school_type),
        urban_locale_type=factor(urban_locale_type),
        reconstituted=factor(reconstituted),
        grade_level=factor(grade_level))
 
+
+# rm(needed_features)
+# rm(with_flags)
+
+#linear<-lm(closed_any~.,for_modeling)
 
 #add the for_modeling dataset to the Rdata
 save(for_modeling,file="for modeling.RData")
