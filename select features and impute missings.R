@@ -5,9 +5,10 @@ library(tidyr)
 
 load("2013-14 school data with closure flags.RData")
 #summary(for_modeling$zip)
-
+names(with_flags)
 #select only variables we chose for model inclusion
 to_include<-c("state" = "MSTATE",
+              "cd" = "CDCODE",
               "school_type" = "TYPE",
               #"supervisory_union" = "UNION",
               "urban_locale_type" = "ULOCAL",
@@ -47,7 +48,6 @@ to_include<-c("state" = "MSTATE",
               "pacific_islander" = "PACIFIC",
               "multi_racial" = "TR",
               "nslp_status" = "NSLPSTATUS",
-              "union" = "UNION",
               #"closed14_15","closed15_16","closed16_17","closed17_18",
               "closed_any")
 #limit just to needed features
@@ -89,8 +89,6 @@ for_modeling<-needed_features%>%
 
 # rm(needed_features)
 # rm(with_flags)
-
-#linear<-lm(closed_any~.,for_modeling)
 
 #add the for_modeling dataset to the Rdata
 save(for_modeling,file="for modeling.RData")
