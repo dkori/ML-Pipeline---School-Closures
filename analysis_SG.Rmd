@@ -1,0 +1,298 @@
+---
+title: "analysis_SG"
+author: "BG"
+date: "12/2/2019"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(httr)
+library(tidyverse)
+library(DataExplorer)
+library(gridExtra)
+library(reshape2)
+library(ggcorrplot)
+library(glmnet)
+library(leaps)  # needed for regsubsets
+library(boot) 
+library(caret)
+library(pROC)
+library(caret)
+```
+#For next steps, create following datasets for modeling: 
+#1. Base data: keep zeroes, add new features (keep all features in)
+#2. Dropped model: drop numeric vars (dropping all zeroes)
+#3. Imputed model: numeric variables (either statistical or conditional imputation)
+#4. Deal with outliers: log_teachers, log_students
+
+#Feature engineeering: 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#SG:Addtions
+load("for modeling.RData")
+
+#Additional conversions for factors in case some models require factors
+for_modeling<-for_modeling%>%
+  mutate(magnet=factor(magnet),
+       shared=factor(shared),
+       charter=factor(charter),
+       title1_status=factor(title1_status),
+       nslp_status=factor(nslp_status))
+
+#For now, drop zeroes (NA, missing, 0) and create a new var ratio of students per teacher; also create % vars for race
+#and free and reduced lunch students for better comparability 
+
+ #Drop all zereos version
+df3 <-for_modeling %>%
+      filter(teachers!=0 & total_students!= 0) %>%
+      mutate(stud_teacher_ratio = ifelse(teachers !=0 & total_students!=0, total_students/teachers, 0),
+            white_perc = white/total_students,
+            asian_perc = asian/total_students,
+            black_perc = black/total_students,
+            amerind_perc = american_indian/total_students,
+            hisp_perc = hisp/total_students,
+            pacif_perc = pacific_islander/total_students,
+            multirac_perc =multi_racial/total_students,
+            freelunch_perc = free_lunch_students/total_students,
+            reducedlunch_perc = reduced_lunch_students/total_students)
+
+
+#All data with discrete/categorical variables except missingness and other vars (closed13/14 etc)
+#Excluded Supervisory union has 99 categories, ungraded (for low info value) this for now. 
+df3 <- df3[, c("closed_any","total_students", "teachers", "free_lunch_students", "reduced_lunch_students",
+                        "american_indian", "asian","hisp", "black", "white", "pacific_islander",
+                        "multi_racial", "school_type",
+                        "urban_locale_type",
+                        "reconstituted",
+                        "grade_level",
+                        "title1_status",
+                        "magnet", "charter", "shared", "stud_teacher_ratio", "nslp_status",
+                         "white_perc", "black_perc", "asian_perc", "amerind_perc", "hisp_perc", "pacif_perc",
+                          "multirac_perc", "freelunch_perc", "reducedlunch_perc")]
+
+table(sum(df3$closed_any)/nrow(df3)) # 4.02% closed_any=1
+
+```
+####The percent of positive class 4.2%. 
+
+#Outliers
+```{r}
+#Table that shows the number of features that are discrete or continuous, and missingness
+introduce(df3)
+#Graph: same info visualized
+plot_intro(df3)
+
+#Outliers in st_teacher_ratio: Example; clean up data more
+#outliers <- boxplot(df3$stud_teacher_ratio, plot=FALSE)$out
+#print(outliers)
+
+#df3[which(df3$stud_teacher_ratio %in% outliers),]
+#df3 <- df3[-which(df3$stud_teacher_ratio %in% outliers),]
+
+#boxplot(df2$st_teacher_ratio)
+#boxplot(df3$stud_teacher_ratio)
+
+table(df3$closed_any)  #Closed schools: 3450
+table(sum(df3$closed_any)/nrow(df3))  #4.02%
+
+```
+#Data Preprocessing: 
+1. Pacific Islander and American Indians are very few and skewed, add them or transform
+2. Reconstituted and school_type: near zero variation as 95-98% are skewed towards one number. 
+3. Transform the variables
+
+```{r}
+
+#Visualization: Outliers and skewed datasets; need for transformations
+plot_boxplot(df3, by = "closed_any")
+
+#Still many outliers that we should consider transforming
+
+#Above boxplots show that many of the continous variables have outliers, highly skewed. Need to transform the 
+#variables. 
+
+#PCA helps identify the most promising predictors/combinations of predictors (desc order of importance by PCA#)
+plot_prcomp(df3, variance_cap = 0.9, nrow = 3L, ncol = 3L)
+
+#Pairwise correlation
+plot_correlation(na.omit(df3), maxcat = 5L)
+library(corrplot)
+nums <- unlist(lapply(df3, is.numeric)) 
+
+df_numeric<- df3[, nums]
+correlations<- cor(df_numeric)
+corrplot(correlations, order="hclust")
+highCor<-findCorrelation(correlations, cutoff=0.75)
+length(highCor)
+head(highCor)
+
+#Drop variables that highly correlated for Log/Reg
+df3<-df3[, -highCor]
+
+
+```
+
+```{r}
+#make sure dep/var is a factor
+df3$closed_any <- factor(df3$closed_any)
+
+#get rid of variables with near zero variation for logisctic regression
+nzVar =nearZeroVar((df3))
+nzVar <-c(13, 15, 28)
+noNZVset <- names(df3)[-nzVar]
+  
+# Modeling with and without Oversampling: Base model 
+#Train/test sets split
+smp_siz = floor(0.70*nrow(df3))  # creates a value for dividing the data into train and test. In this case the value is defined as 75% of the number of rows in the dataset
+smp_siz  # shows the value of the sample size
+
+set.seed(123)   # set seed to ensure you always have same random numbers generated
+train_ind = sample(seq_len(nrow(df3)),size = smp_siz)  # Randomly identifies therows equal to sample size ( defined in previous instruction) from  all the rows of dataset and stores the row number in train_ind
+train =df3[train_ind,] 
+
+other =df3[-train_ind,] 
+set.seed(934)
+smp_siz2 = floor(0.30*nrow(other)) 
+split2 = sample(seq_len(nrow(other)), size = smp_siz2)
+validation =other[split2,]
+test = other[-split2,]
+predictors <-names(train)[names(train) !="closed_any"]
+
+table(train$closed_any)
+table(validation$closed_any)
+table(test$closed_any)
+
+levels(train$closed_any)
+
+#Make sure the closed_any occupies about the same percentage in each set
+sum(as.numeric(as.character(train$closed_any))/nrow(train))  
+sum(as.numeric(as.character(validation$closed_any))/nrow(validation))  
+sum(as.numeric(as.character(test$closed_any))/nrow(test)) 
+
+```
+
+#Each train, validation, and test set contains positive class of about x%. 
+
+```{r}
+#Logistic Regression: Base Model, for logreg keep noNZVset
+
+glm.fits_closed=glm(closed_any ~ ., 
+                     data = train[, noNZVset], family=binomial)
+coef(summary(glm.fits_closed))
+
+#On validation set
+glm.probs_val =predict(glm.fits_closed, validation, type="response")
+
+glm.pred_val = rep(0, nrow(validation))
+glm.pred_val[glm.probs_val >.5]= 1
+table(glm.pred_val,validation$closed_any)
+mean(glm.pred_val==validation$closed_any)
+
+#Confusion matrix with full metrics
+confusionMatrix(table(validation$closed_any, glm.pred_val), positive="1")
+
+rocCurve <- roc(validation$closed_any,glm.pred_val)
+
+auc(rocCurve)
+
+plot(rocCurve, legacy.axes =TRUE)
+
+```
+###Results of log/reg shows that class 0 or "not closed" is predicted well and the accuracy is high, but...
+The prediction accuracy is: 95.9% due to high imbalanced class of 0s, sensitity of 0%, high specificity of 95%
+AUC: 50%, same as random guessing
+
+```{r}
+#Approach 1: Alternate cutoff: One way to tackle imbalance: 0.1
+glm.pred_val = rep(0, nrow(validation))
+glm.pred_val[glm.probs_val >.1]= 1
+table(glm.pred_val,validation$closed_any)
+mean(glm.pred_val==validation$closed_any)
+
+#Confusion matrix with full metrics
+confusionMatrix(table(validation$closed_any, glm.pred_val), positive="1")
+
+rocCurve <- roc(validation$closed_any,glm.pred_val)
+
+auc(rocCurve)
+
+plot(rocCurve, legacy.axes =TRUE)
+
+```
+#Alternative cutoff: 0.1
+###Results of log/reg shows that class 0 or "not closed" is predicted well and the accuracy is high, but...
+The prediction accuracy is: 87.8% due to high imbalanced class of 0s, poor sensitity of 16.9%, high specificity of 98%
+AUC: 70%, improved somewhat compared to 50%
+
+```{r cars}
+#Strategy 2: Logistic Reg with Oversampling: Upsample the training dataset, predict on validation set
+library(caret)
+set.seed(1103)
+
+upSampledTrain <-upSample(x = train[, predictors], y = train$closed_any, yname="closed_any")
+
+dim(upSampledTrain)
+table(upSampledTrain$closed_any)
+
+#Logistic Regression: 
+glm.fits_closed=glm(closed_any ~ ., 
+                    data = upSampledTrain, family=binomial)
+coef(summary(glm.fits_closed))
+
+#on validation set
+glm.probs_val =predict(glm.fits_closed, validation, type="response")
+
+glm.pred_val = rep(0, nrow(validation))
+glm.pred_val[glm.probs_val >.5]= 1
+table(glm.pred_val,validation$closed_any)
+mean(glm.pred_val==validation$closed_any)
+
+#Confusion matrix with full metrics
+confusionMatrix(table(validation$closed_any, glm.pred_val), positive ='1') 
+
+rocCurve <- roc(validation$closed_any,glm.pred_val)
+
+auc(rocCurve)
+
+plot(rocCurve, legacy.axes =TRUE)
+
+
+```
+
+
+####Accuracy 71; sensitivity: 0.10; Specificity: 0.98
+#AUC became 76.1, the graph looks slightly better
+
+```{r}
+#Oversampling predict on Test Set
+
+glm.probs_test =predict(glm.fits_closed, test, type="response")
+
+glm.pred_test = rep(0, nrow(test))
+glm.pred_test[glm.probs_test >.5]= 1
+table(glm.pred_test,test$closed_any)
+mean(glm.pred_test==test$closed_any)
+
+#Confusion matrix with full metrics
+confusionMatrix(table(test$closed_any, glm.pred_test), positive ='1') 
+
+rocCurve <- roc(test$closed_any,glm.pred_test)
+
+auc(rocCurve)
+
+plot(rocCurve, legacy.axes =TRUE)
+
+```
+
+####On Test: Accuracy 71; sensitivity: 10.7; Specificity: 98.7
+#AUC became 75, the graph looks about the same
+
+#Next steps: 
+# This model dropped all zeroes from 2 vars. 
+# Run additional models such as Random Forest, Lasso, or QDA on the following datasets: 
+# basecase: with all zeroes and imputed NAs and compare accuracies. 
+
