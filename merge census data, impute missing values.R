@@ -87,7 +87,6 @@ needed_features<-with_flags%>%
 
 ############# 1.) Drop NAs / missing data   
 ############# 2.) Conditional imputation for missing values
-
 ##### 1.) Drop rows with NA values
 dropped_nas<-needed_features%>%
   #remove rows where its NAs
@@ -105,10 +104,20 @@ dropped_nas<-needed_features%>%
          multirac_perc =multi_racial/total_students,
          freelunch_perc = free_lunch_students/total_students,
          reducedlunch_perc = reduced_lunch_students/total_students)%>%
-  #impute means for census variables missing
-  replace_na("median_family_incomeE"=mean(median_family_incomeE,na.rm=TRUE),
-             "median_home_valueE"=mean(median_home_valueE,na.rm=TRUE),
-             "poverty_rate"=mean(poverty_rate,na.rm=TRUE))%>%
+  #replace NAs for census variables by imputing means
+  mutate(median_family_incomeE=ifelse(is.na(median_family_incomeE),
+                                      mean(median_family_incomeE,na.rm=TRUE),
+                                      median_family_incomeE),
+         median_home_valueE=ifelse(is.na(median_home_valueE),
+                                   mean(median_home_valueE,na.rm=TRUE),
+                                   median_home_valueE),
+         poverty_rate=ifelse(is.na(poverty_rate),
+                             mean(poverty_rate,na.rm=TRUE),
+                             poverty_rate))%>%
+  # #impute means for census variables missing
+  # replace_na(list("median_family_incomeE"=mean(median_family_incomeE,na.rm=TRUE),
+  #            "median_home_valueE"=mean(median_home_valueE,na.rm=TRUE),
+  #            "poverty_rate"=mean(poverty_rate,na.rm=TRUE)))%>%
   #make categorical variables factors so R doesn't think they're continous
   mutate(state=factor(state),
          school_type=factor(school_type),
@@ -160,7 +169,17 @@ with_imputations<-with_imputations%>%
        school_type=factor(school_type),
        urban_locale_type=factor(urban_locale_type),
        reconstituted=factor(reconstituted),
-       grade_level=factor(grade_level))
+       grade_level=factor(grade_level))%>%
+  #replace NAs in census variables with means
+  mutate(median_family_incomeE=ifelse(is.na(median_family_incomeE),
+                                      mean(median_family_incomeE,na.rm=TRUE),
+                                      median_family_incomeE),
+         median_home_valueE=ifelse(is.na(median_home_valueE),
+                                   mean(median_home_valueE,na.rm=TRUE),
+                                   median_home_valueE),
+         poverty_rate=ifelse(is.na(poverty_rate),
+                             mean(poverty_rate,na.rm=TRUE),
+                             poverty_rate))%>%
 
 # rm(needed_features)
 # rm(with_flags)

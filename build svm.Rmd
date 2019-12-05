@@ -1,0 +1,69 @@
+---
+title: "build sum"
+author: "Devraj Kori"
+date: "12/4/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(e1071)
+
+```
+
+```{r load_data,echo=FALSE}
+load("for modeling.RData")
+
+#to avoid adding too much dimensionality, only keep percent variables for race and lunch
+dropped_nas<-dropped_nas%>%
+  select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
+  #make closed_any a factor since SVM is a categorical classifier
+  mutate(closed_any=factor(closed_any))
+with_imputations<-with_imputations%>%
+  select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
+  #make closed_any a factor since SVM is a categorical classifier
+  mutate(closed_any=factor(closed_any))
+
+
+```
+
+#fit SVM for dataset with values dropped
+```{r dropped_svm_select_kernel}
+#create training and test splits
+set.seed(420)
+train<-sample(1:nrow(dropped_nas),nrow(dropped_nas)*.6)
+#select a random subset of dropped_nas to run on 
+dropped_na_train<-dropped_nas[train,]
+dropped_na_test<-dropped_nas[-train,]
+
+
+x<-Sys.time()
+svm_dropped_linear<-svm(closed_any~.,data=dropped_na_train,kernel="linear")
+y<-Sys.time()
+
+linear_runtime<-y-x
+
+x<-Sys.time()
+svm_dropped_radial<-svm(closed_any~.,data=dropped_na_train,kernel="radial")
+y<-Sys.time()
+
+radial_runtime<-y-x
+
+radial_runtime
+linear_runtime
+
+summary(svm_dropped_radial)
+summary(svm_dropped_linear)
+
+pred_linear<-predict(svm_dropped_linear,dropped_na_test%>%select(-closed_any))
+pred_radial<-predict(svm_dropped_radial,dropped_na_test%>%select(-closed_any))
+
+table(pred_linear,dropped_na_test$closed_any)
+table(pred_radial,dropped_na_test$closed_any)
+
+
+
+```
