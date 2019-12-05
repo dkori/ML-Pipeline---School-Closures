@@ -179,10 +179,11 @@ with_imputations<-with_imputations%>%
                                    median_home_valueE),
          poverty_rate=ifelse(is.na(poverty_rate),
                              mean(poverty_rate,na.rm=TRUE),
-                             poverty_rate))%>%
+                             poverty_rate))
 
 # rm(needed_features)
 # rm(with_flags)
-
+summary(dropped_nas)
+summary(with_imputations)
 #add the for_modeling dataset to the Rdata
 save(dropped_nas,with_imputations,file="for modeling.RData")
