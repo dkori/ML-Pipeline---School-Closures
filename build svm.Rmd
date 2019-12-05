@@ -93,7 +93,8 @@ linear_runtime
 
 pred_linear<-predict(svm_dropped_linear,with_imputations_test%>%select(-closed_any))
 pred_radial<-predict(svm_dropped_radial,with_imputations_test%>%select(-closed_any))
-summary(with_imputations$missing_teacher)
+
+
 table(pred_linear,with_imputations_test$closed_any)
 table(pred_radial,with_imputations_test$closed_any)
 

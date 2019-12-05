@@ -13,6 +13,7 @@ library(tidycensus)
 #create list of relevant census variables
 census_var_list<-c("median_family_income"="B19113_001","median_home_value" = "B25107_001",
                    "poverty_denominator"="B16009_001","poverty_pop"="B16009_002")
+
 census_data<-get_acs(geography="zcta",variables=census_var_list,year=2014,output="wide")%>%
   #create poverty rate
   mutate(poverty_rate=poverty_popE/poverty_denominatorE)%>%
@@ -137,8 +138,10 @@ with_imputations<-needed_features%>%
          missing_students=ifelse(total_students%in%c(0,-1,-2),1,0))
 
 
+#create list of vectors to have 0, -1, and -2 replaced by 1
+to_impute<-names(with_imputations)[!names(with_imputations)%in%c("missing_teacher","na_teacher","missing_students","closed_any")]
 
-for(var in names(with_imputations)){
+for(var in to_impute){
   #create a temporary vector of given variable
   temp_vector<-with_imputations[,var]
   #rename temporary vector
