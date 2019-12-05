@@ -38,7 +38,7 @@ train<-sample(1:nrow(dropped_nas),nrow(dropped_nas)*.6)
 #select a random subset of dropped_nas to run on 
 dropped_na_train<-dropped_nas[train,]
 dropped_na_test<-dropped_nas[-train,]
-
+?svm
 
 x<-Sys.time()
 svm_dropped_linear<-svm(closed_any~.,data=dropped_na_train,kernel="linear")
@@ -61,9 +61,41 @@ summary(svm_dropped_linear)
 pred_linear<-predict(svm_dropped_linear,dropped_na_test%>%select(-closed_any))
 pred_radial<-predict(svm_dropped_radial,dropped_na_test%>%select(-closed_any))
 
-table(pred_linear,dropped_na_test$closed_any)
-table(pred_radial,dropped_na_test$closed_any)
+```
 
+
+
+```{r dropped_svm_select_kernel}
+#create training and test splits
+set.seed(420)
+train<-sample(1:nrow(with_imputations),nrow(with_imputations)*.6)
+#select a random subset of dropped_nas to run on 
+with_imputations_train<-with_imputations[train,]
+with_imputations_test<-with_imputations[-train,]
+
+x<-Sys.time()
+svm_imputed_linear<-svm(closed_any~.,data=with_imputations_train,kernel="linear")
+y<-Sys.time()
+
+linear_runtime<-y-x
+
+x<-Sys.time()
+svm_imputed_radial<-svm(closed_any~.,data=with_imputations_train,kernel="radial")
+y<-Sys.time()
+
+radial_runtime<-y-x
+
+radial_runtime
+linear_runtime
+# 
+# summary(svm_dropped_radial)
+# summary(svm_dropped_linear)
+
+pred_linear<-predict(svm_dropped_linear,with_imputations_test%>%select(-closed_any))
+pred_radial<-predict(svm_dropped_radial,with_imputations_test%>%select(-closed_any))
+summary(with_imputations$missing_teacher)
+table(pred_linear,with_imputations_test$closed_any)
+table(pred_radial,with_imputations_test$closed_any)
 
 
 ```
