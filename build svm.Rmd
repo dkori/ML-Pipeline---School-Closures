@@ -25,11 +25,13 @@ load("for modeling.RData")
 dropped_nas<-dropped_nas%>%
   select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
   #make closed_any a factor since SVM is a categorical classifier
-  mutate(closed_any=factor(closed_any))
+  mutate(closed_any=factor(closed_any))%>%
+  filter(!is.na(urban_locale_type))
 with_imputations<-with_imputations%>%
   select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
   #make closed_any a factor since SVM is a categorical classifier
-  mutate(closed_any=factor(closed_any))
+  mutate(closed_any=factor(closed_any))%>%
+  filter(!is.na(urban_locale_type))
 
 
 ```
@@ -120,8 +122,9 @@ for(var in names(dropped_nas)){
 #set up paralell execution, from here:https://www.r-bloggers.com/improve-svm-tuning-through-parallelism/
 cl<-makeCluster(detectCores(),type="SOCK")
 registerDoSNOW(cl)
+
 #create formula
-rhs<-names(dropped_nas)[!names(dropped_nas)%in%c("closed_any","folds","cd")]
+rhs<-names(dropped_nas)[!names(dropped_nas)%in%c("closed_any","folds","cd","state")]
 fml<-as.formula(paste0("closed_any~",
                            paste(rhs,collapse="+")))
 
@@ -131,16 +134,17 @@ class_weights=list(c("0"=1,"1"=20),
                    c("0"=1,"1"=50),
                    c("0"=1,"1"=100))
 
-gammas<-c(.5,1,2)
-params<-expand.grid(costs=costs,class_weights=class_weights,gammas=gammas)
+params<-expand.grid(costs=costs,class_weights=class_weights)
 #create a training / validation split
 train<-sample(1:nrow(dropped_nas),nrow(dropped_nas)*.8)
 
 train_set<-dropped_nas[train,]%>%
   #remove cd
-  select(-cd)
+  select(-cd)%>%
+  select(-state)
 validation<-dropped_nas[-train,]%>%
-  select(-cd)
+  select(-cd)%>%
+  select(-state)
 #create folds
 train_set$folds<-createFolds(1:nrow(train_set),k=4,list=FALSE)
 gc()
@@ -158,7 +162,7 @@ for(i in 1:nrow(params)){
     # setTkProgressBar(mypb, 1, title = "SVM Cross Validation", label = NULL)
     deve <- train_set[train_set$folds != j, ]
     test <- train_set[train_set$folds == j, ]
-    mdl <- e1071::svm(fml, data = deve, type = "C-classification", kernel = "radial", cost = c, gamma = g,
+    mdl <- e1071::svm(fml, data = deve, type = "C-classification", kernel = "radial", cost = c, #gamma = g,
                       cost.weight=cw, probability = TRUE)
     pred <- predict(mdl, test#%>%select(closed_any,teachers)
                     )
