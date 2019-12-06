@@ -79,7 +79,9 @@ needed_features<-with_flags%>%
   #merge in census data
   left_join(census_data,by="MZIP")%>%
   #remove zip
-  select(-MZIP)
+  select(-MZIP)%>%
+  #exclude PR
+  filter(state!="PR")
 
 #######################Create 2 Datasets #########################################
 #there are a few kinds of data missing in the dataset

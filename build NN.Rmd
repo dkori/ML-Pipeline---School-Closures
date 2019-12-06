@@ -1,0 +1,49 @@
+---
+title: "build NN"
+author: "Devraj Kori"
+date: "12/4/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(e1071)
+library(caret)
+library(foreach)
+library(doParallel)
+library(tcltk)
+library(doSNOW)
+library(keras)
+```
+
+```{r load_data,echo=FALSE}
+load("for modeling.RData")
+
+#to avoid adding too much dimensionality, only keep percent variables for race and lunch
+# dropped_nas<-dropped_nas%>%
+#   select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
+#   #make closed_any a factor since SVM is a categorical classifier
+#   mutate(closed_any=factor(closed_any))%>%
+#   filter(!is.na(urban_locale_type))
+
+with_imputations<-with_imputations%>%
+  select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
+  #make closed_any a factor since SVM is a categorical classifier
+  mutate(closed_any=factor(closed_any))%>%
+  filter(!is.na(urban_locale_type))%>%
+  filter(state!="PR")
+
+```
+
+
+```{r create_base_model}
+
+pr<-with_flags[with_flags$MSTATE=="PR",]
+dc<-with_flags[with_flags$MSTATE=="DC",]
+summary(dc[,grep("closed",names(dc))])
+summary(pr[,grep("closed",names(pr))])
+summary(pr)
+```

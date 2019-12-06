@@ -1,5 +1,5 @@
 ---
-title: "build sum"
+title: "build svm"
 author: "Devraj Kori"
 date: "12/4/2019"
 output: html_document
@@ -118,7 +118,6 @@ for(var in names(dropped_nas)){
   dropped_nas[,var]<-temp_vector
 }
 
-
 #set up paralell execution, from here:https://www.r-bloggers.com/improve-svm-tuning-through-parallelism/
 cl<-makeCluster(detectCores(),type="SOCK")
 registerDoSNOW(cl)
@@ -129,10 +128,10 @@ fml<-as.formula(paste0("closed_any~",
                            paste(rhs,collapse="+")))
 
 #create lists of parameters to tune
-costs<-c(0.01, 0.1, 1,10,100)
+costs<-c(0.01, 0.1, 1)
 class_weights=list(c("0"=1,"1"=20),
-                   c("0"=1,"1"=50),
-                   c("0"=1,"1"=100))
+                   c("0"=1,"1"=40),
+                   c("0"=1,"1"=80))
 
 params<-expand.grid(costs=costs,class_weights=class_weights)
 #create a training / validation split
@@ -162,7 +161,7 @@ for(i in 1:nrow(params)){
     # setTkProgressBar(mypb, 1, title = "SVM Cross Validation", label = NULL)
     deve <- train_set[train_set$folds != j, ]
     test <- train_set[train_set$folds == j, ]
-    mdl <- e1071::svm(fml, data = deve, type = "C-classification", kernel = "radial", cost = c, #gamma = g,
+    mdl <- e1071::svm(fml, data = deve, type = "C-classification", kernel = "linear", cost = c, #gamma = g,
                       cost.weight=cw, probability = TRUE)
     pred <- predict(mdl, test#%>%select(closed_any,teachers)
                     )
@@ -173,7 +172,7 @@ for(i in 1:nrow(params)){
   #compute sensitivity and specificity
   sensitivity<-sensitivity(out$pred,out$y)
   specificity<-specificity(out$pred,out$y)
-  temp_frame<-data.frame(params=paste(params[i, ],sep=" "),
+  temp_frame<-data.frame(params=paste(params[i, ],collapse=" "),
              sensitivity=sensitivity,
              specificity=specificity)
   if(i==1){
