@@ -131,18 +131,53 @@ history = base_model%>%fit(xtrain,ytrain,
 ```
 
 ```{r run_base_model_on_validation}
-preds<-predict(base_model,batch_size = 64, x=xtrain)
+preds<-predict(base_model,batch_size = 64, x=xtest)
 
-prediction_matrix<-table(preds,ytrain)%>%as.data.frame
-ft_auc=prediction(preds,ytrain)%>%
+prediction_matrix<-table(preds,ytest)%>%as.data.frame
+ft_auc=prediction(preds,ytest)%>%
   performance("auc")%>%.@y.values%>%.[[1]]
 
-prediction(preds,ytrain)%>%
+prediction(preds,ytest)%>%
   performance(measure="tpr",x.measure="fpr")%>%plot()
 
 prediction_matrix%>%
   uncount(Freq)%>%
-  mutate(preds=round(as.numeric(paste0(preds)),4))%>%
-  ggplot(aes(x=preds,colour=ytrain,fill=ytrain))+
+  mutate(preds=as.numeric(paste0(preds)))%>%
+  ggplot(aes(x=preds,colour=ytest,fill=ytest))+
   geom_density(alpha=.5)
+
+#create a test confusion matrix
+table(ifelse(as.numeric(paste0(preds))>.15,1,0),
+      ytest)
+
+#save model
+save(base_model,file="trained neural net.RData")
+
+```
+
+
+```{r fine_tune}
+predictions<-base_model$output%>%
+  layer_dense(units=1024,activation='relu',kernel_regularizer = regularizer_l1())%>%
+  layer_dense(units=1,activation='sigmoid',kernel_regularizer=regularizer_l1())
+
+#create fine tune model
+ft=keras_model(inputs=base_model$input,outputs=predictions)
+freeze_weights(base_model)
+
+ft%>%compile(optimizer='adam',loss = 'binary_crossentropy')
+
+history1<-ft%>%fit(x=xtrain,
+                   y=ytrain,
+                   epochs=10,
+                   batch_size=8,
+                   validation_split=.1,
+                   class_weights=c("0"=1,"1"=23))
+#freeze first 4 base_model weights
+freeze_weights(base_model,from=1,to=4)
+unfreeze_weights(base_model,from=5)
+ft%>%compile(optimizer=optimizer_sgd(lr=0.0001,momentum-0.9),
+             loss='binary_crossentropy')
+history2<-ft%>%fit(x=xtrain,y=ytrain,epochs2,batch_size=8)
+
 ```
