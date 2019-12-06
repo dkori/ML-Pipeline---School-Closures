@@ -122,7 +122,7 @@ base_model%>%compile(
   metrics=c('mae')
 )
 history = base_model%>%fit(xtrain,ytrain,
-                       epochs=100,
+                       epochs=125,
                        batch_size=64,
                        validation_split=0.2,
                        #define class_weights to account for rarity of school closures
@@ -140,44 +140,98 @@ ft_auc=prediction(preds,ytest)%>%
 prediction(preds,ytest)%>%
   performance(measure="tpr",x.measure="fpr")%>%plot()
 
-prediction_matrix%>%
+base_density<-prediction_matrix%>%
   uncount(Freq)%>%
   mutate(preds=as.numeric(paste0(preds)))%>%
   ggplot(aes(x=preds,colour=ytest,fill=ytest))+
   geom_density(alpha=.5)
-
+base_density
 #create a test confusion matrix
-table(ifelse(as.numeric(paste0(preds))>.15,1,0),
+table(ifelse(as.numeric(paste0(preds))>.05,1,0),
       ytest)
 
-#save model
-save(base_model,file="trained neural net.RData")
+summary(base_model)
+summary(base_model2)
+base_model %>% save_model_hdf5("base_modelf.h5")
+#new_model<-load_model_hdf5("base_model9am.h5")
 
+new_model1<-load_model_hdf5("base_modele.h5")
+new_model2<-load_model_hdf5("base_modelb.h5")
+preds1<-predict(new_model1,batch_size = 64, x=xtest)
+preds2<-predict(new_model2,batch_size = 64, x=xtest)
+prediction_matrix1<-table(preds1,ytest)%>%as.data.frame
+prediction_matrix2<-table(preds2,ytest)%>%as.data.frame
+
+prediction(preds1,ytest)%>%
+  performance(measure="tpr",x.measure="fpr")%>%plot()
+prediction(preds2,ytest)%>%
+  performance(measure="tpr",x.measure="fpr")%>%plot()
+base_density1<-prediction_matrix1%>%
+  uncount(Freq)%>%
+  mutate(preds=as.numeric(paste0(preds1)))%>%
+  ggplot(aes(x=preds,colour=ytest,fill=ytest))+
+  geom_density(alpha=.5)
+base_density2<-prediction_matrix2%>%
+  uncount(Freq)%>%
+  mutate(preds=as.numeric(paste0(preds2)))%>%
+  ggplot(aes(x=preds,colour=ytest,fill=ytest))+
+  geom_density(alpha=.5)
+
+base_density
+base_density1
+base_density2
+table(ifelse(as.numeric(paste0(preds1))>.075,1,0),
+      ytest)
+base_density
 ```
 
 
 ```{r fine_tune}
-predictions<-base_model$output%>%
-  layer_dense(units=1024,activation='relu',kernel_regularizer = regularizer_l1())%>%
-  layer_dense(units=1,activation='sigmoid',kernel_regularizer=regularizer_l1())
+# predictions<-base_model$output%>%
+#   layer_dense(units=1024,activation='relu',kernel_regularizer = regularizer_l1())%>%
+#   layer_dense(units=1,activation='sigmoid',kernel_regularizer=regularizer_l1())
+# 
+# #create fine tune model
+# ft=keras_model(inputs=base_model$input,outputs=predictions)
+# freeze_weights(base_model)
+# 
+# ft%>%compile(optimizer='adam',loss = 'binary_crossentropy')
+# 
+# history1<-ft%>%fit(x=xtrain,
+#                    y=ytrain,
+#                    epochs=100,
+#                    batch_size=8,
+#                    validation_split=.1,
+#                    class_weights=c("0"=1,"1"=23))
+# #freeze first 4 base_model weights
+# freeze_weights(base_model,from=1,to=2)
+# 
+# unfreeze_weights(base_model,from=3)
+# ft%>%compile(optimizer=optimizer_sgd(lr=0.0001,momentum=0.9),
+#              loss='binary_crossentropy')
+# history2<-ft%>%fit(x=xtrain,y=ytrain,epochs=10,batch_size=8)
 
-#create fine tune model
-ft=keras_model(inputs=base_model$input,outputs=predictions)
-freeze_weights(base_model)
+```
 
-ft%>%compile(optimizer='adam',loss = 'binary_crossentropy')
-
-history1<-ft%>%fit(x=xtrain,
-                   y=ytrain,
-                   epochs=10,
-                   batch_size=8,
-                   validation_split=.1,
-                   class_weights=c("0"=1,"1"=23))
-#freeze first 4 base_model weights
-freeze_weights(base_model,from=1,to=4)
-unfreeze_weights(base_model,from=5)
-ft%>%compile(optimizer=optimizer_sgd(lr=0.0001,momentum-0.9),
-             loss='binary_crossentropy')
-history2<-ft%>%fit(x=xtrain,y=ytrain,epochs2,batch_size=8)
-
+```{r test_fine_tuned}
+# preds<-predict(ft,batch_size = 64, x=xtest)
+# 
+# prediction_matrix<-table(preds,ytest)%>%as.data.frame
+# ft_auc=prediction(preds,ytest)%>%
+#   performance("auc")%>%.@y.values%>%.[[1]]
+# 
+# prediction(preds,ytest)%>%
+#   performance(measure="tpr",x.measure="fpr")%>%plot()
+# 
+# ft_density<-prediction_matrix%>%
+#   uncount(Freq)%>%
+#   mutate(preds=as.numeric(paste0(preds)))%>%
+#   ggplot(aes(x=preds,colour=ytest,fill=ytest))+
+#   geom_density(alpha=.5)
+# 
+# #create a test confusion matrix
+# table(ifelse(as.numeric(paste0(preds))>.15,1,0),
+#       ytest)
+# base_density
+# ft_density
 ```
