@@ -80,8 +80,8 @@ needed_features<-with_flags%>%
   left_join(census_data,by="MZIP")%>%
   #remove zip
   select(-MZIP)%>%
-  #exclude PR
-  filter(state!="PR")
+  #exclude PR and territories
+  filter(!state%in%c("AS", "AE", "AP", "GU", "MP", "VI","PR"))
 
 #######################Create 2 Datasets #########################################
 #there are a few kinds of data missing in the dataset

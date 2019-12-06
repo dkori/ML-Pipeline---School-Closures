@@ -40,10 +40,11 @@ with_imputations<-with_imputations%>%
 
 
 ```{r create_base_model}
-
+unique(with_imputations$state)
 pr<-with_flags[with_flags$MSTATE=="PR",]
 dc<-with_flags[with_flags$MSTATE=="DC",]
+ae<-with_flags[with_flags$MSTATE=="AE",]
 summary(dc[,grep("closed",names(dc))])
 summary(pr[,grep("closed",names(pr))])
-summary(pr)
+summary(ae[,grep("closed",names(ae))])
 ```
