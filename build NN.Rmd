@@ -17,6 +17,7 @@ library(doParallel)
 library(tcltk)
 library(doSNOW)
 library(keras)
+library(ROCR)
 ```
 
 ```{r load_data,echo=FALSE}
@@ -30,21 +31,118 @@ load("for modeling.RData")
 #   filter(!is.na(urban_locale_type))
 
 with_imputations<-with_imputations%>%
-  select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
+  #select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
   #make closed_any a factor since SVM is a categorical classifier
   mutate(closed_any=factor(closed_any))%>%
   filter(!is.na(urban_locale_type))%>%
-  filter(state!="PR")
+  filter(state!="PR")%>%
+  select(-c("state","cd"))
 
 ```
 
 
-```{r create_base_model}
-unique(with_imputations$state)
-pr<-with_flags[with_flags$MSTATE=="PR",]
-dc<-with_flags[with_flags$MSTATE=="DC",]
-ae<-with_flags[with_flags$MSTATE=="AE",]
-summary(dc[,grep("closed",names(dc))])
-summary(pr[,grep("closed",names(pr))])
-summary(ae[,grep("closed",names(ae))])
+```{r prep_data}
+#make character variables into factors
+for(var in names(with_imputations)){
+  temp_vector<-with_imputations[,var]
+  if(is.character(temp_vector[[1]])){
+    temp_vector[[1]]<-factor(temp_vector[[1]])
+  }
+  with_imputations[,var]<-temp_vector
+}
+#create a function that turns the factor variables into dummies
+create_dummies<-function(df){
+  cols<-colnames(df)
+  for(i in 1:length(cols)){
+    col<-cols[i]
+    temp_frame<-df[,i]
+    #test if the column is a character
+    if(is.factor(temp_frame[[col]])){
+      #create a model matrix of binaries for each category of the character variable
+      names(temp_frame)<-"binary"
+      temp_frame2<-data.frame(model.matrix(~binary,data=temp_frame))[-1]
+      colnames(temp_frame2)<-gsub("binary",col,colnames(temp_frame2))
+    }else{
+      #if not character, just keep it the same
+      temp_frame2<-temp_frame
+    }
+    if(i==1){
+      #we don't want to replace the first column, quick way to skip it
+      result_frame<-temp_frame2
+    }else{
+      result_frame<-cbind(result_frame,temp_frame2)
+    }
+  }
+  result_frame
+}
+
+#apply create_dummies function to everything but closed_any
+with_imputations_wide<-create_dummies(with_imputations)
+
+set.seed(200)
+#split train and test, create matrices
+traini<-sample(1:nrow(with_imputations_wide),size=nrow(with_imputations_wide)*.5)
+train<-with_imputations_wide[traini,]
+test<-with_imputations_wide[-traini,]
+
+#create x and y matrices for train and test sets
+xtrain<-train%>%select(-c("closed_any1"))%>%as.matrix()
+xtest<-test%>%select(-c("closed_any1"))%>%as.matrix()
+
+ytrain<-train[,"closed_any1"]%>%as.matrix()
+ytest<-test[,"closed_any1"]%>%as.matrix()
+
+
+```
+
+```{r base_model}
+#create a base model with 3 hidden layers
+base_model=keras_model_sequential()
+l1=1e-2
+
+base_model%>%
+  layer_dense(units=32,activation="relu",kernel_regularizer=regularizer_l1(l1),
+              input_shape=ncol(xtrain))%>%
+  #layer_dense(units=32,activation="relu",kernel_regularizer=regularizer_l1(l1))%>%
+  #layer_dense(units=32,activation="tanh",kernel_regularizer=regularizer_l1(l1))%>%
+
+  layer_dense(units=32,activation="relu",kernel_regularizer=regularizer_l1(l1))%>%
+  layer_dense(units=1,activation="sigmoid",kernel_regularizer=regularizer_l1(l1))
+summary(base_model)
+
+
+```
+
+
+```{r train_base_model}
+#compile base model, binary_crossentropy is appropriate for classification task
+base_model%>%compile(
+  loss='binary_crossentropy',
+  optimizer=optimizer_adam(),
+  metrics=c('mae')
+)
+history = base_model%>%fit(xtrain,ytrain,
+                       epochs=100,
+                       batch_size=64,
+                       validation_split=0.2,
+                       #define class_weights to account for rarity of school closures
+                       class_weights=c("0"=1,"1"=23),
+                       shuffle=T)
+```
+
+```{r run_base_model_on_validation}
+preds<-predict(base_model,batch_size = 64, x=xtrain)
+
+prediction_matrix<-table(preds,ytrain)%>%as.data.frame
+ft_auc=prediction(preds,ytrain)%>%
+  performance("auc")%>%.@y.values%>%.[[1]]
+
+prediction(preds,ytrain)%>%
+  performance(measure="tpr",x.measure="fpr")%>%plot()
+
+prediction_matrix%>%
+  uncount(Freq)%>%
+  mutate(preds=round(as.numeric(paste0(preds)),4))%>%
+  ggplot(aes(x=preds,colour=ytrain,fill=ytrain))+
+  geom_density(alpha=.5)
 ```

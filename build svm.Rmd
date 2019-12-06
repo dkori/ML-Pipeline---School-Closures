@@ -105,6 +105,102 @@ table(pred_linear,with_imputations_test[!is.na(with_imputations_test$urban_local
 table(pred_radial,with_imputations_test[!is.na(with_imputations_test$urban_locale_type),]$closed_any)
 summary(with_imputations_test)
 ```
+```{r tune_svm_parallel_one_split}
+#tune svm radial model
+#based on error described here, need to replace some characters with factors: https://stackoverflow.com/questions/38021967/error-subscript-logical-subscript-too-long-with-tune-svm-from-e1071-package
+
+for(var in names(dropped_nas)){
+  temp_vector<-dropped_nas[,var]
+  if(is.character(temp_vector[[1]])){
+    temp_vector[[1]]<-factor(temp_vector[[1]])
+  }
+  dropped_nas[,var]<-temp_vector
+}
+
+#set up paralell execution, from here:https://www.r-bloggers.com/improve-svm-tuning-through-parallelism/
+cl<-makeCluster(detectCores(),type="SOCK")
+registerDoSNOW(cl)
+
+#create formula
+rhs<-names(dropped_nas)[!names(dropped_nas)%in%c("closed_any","folds","cd","state")]
+fml<-as.formula(paste0("closed_any~",
+                           paste(rhs,collapse="+")))
+
+#create lists of parameters to tune
+costs<-c(0.01, 0.1, 1)
+class_weights=list(c("0"=1,"1"=20),
+                   c("0"=1,"1"=40),
+                   c("0"=1,"1"=80))
+
+params<-expand.grid(costs=costs,class_weights=class_weights)
+#create a training / validation split
+train<-sample(1:nrow(dropped_nas),nrow(dropped_nas)*.7)
+
+train_set<-dropped_nas[train,]%>%
+  #remove cd
+  select(-cd)%>%
+  select(-state)
+validation<-dropped_nas[-train,]%>%
+  select(-cd)%>%
+  select(-state)
+#create folds
+train_set$folds<-createFolds(1:nrow(train_set),k=4,list=FALSE)
+gc()
+for(i in 1:nrow(params)){
+  print(i)
+  c <- params[i, ]$costs
+  g <- params[i, ]$gammas
+  cw<-params[i,]$class_weights
+  ### K-FOLD VALIDATION ###
+  out <- foreach(j = 1:max(train_set$folds), .combine = rbind, .inorder = FALSE) %dopar% {
+    # #create progress bar
+    # mypb <- tkProgressBar(title = "R progress bar", label = "",
+    #       min = 0, max = 1, initial = 0, width = 300)
+    # #call progress bar
+    # setTkProgressBar(mypb, 1, title = "SVM Cross Validation", label = NULL)
+    deve <- train_set[train_set$folds != j, ]
+    test <- train_set[train_set$folds == j, ]
+    mdl <- e1071::svm(fml, data = deve, type = "C-classification", kernel = "linear", cost = c, #gamma = g,
+                      cost.weight=cw, probability = TRUE)
+    pred <- predict(mdl, test#%>%select(closed_any,teachers)
+                    )
+    # close(mypb)
+    data.frame(y = test$closed_any, pred = pred)
+    
+  }
+  #compute sensitivity and specificity
+  sensitivity<-sensitivity(out$pred,out$y)
+  specificity<-specificity(out$pred,out$y)
+  temp_frame<-data.frame(params=paste(params[i, ],collapse=" "),
+             sensitivity=sensitivity,
+             specificity=specificity)
+  if(i==1){
+    results<-temp_frame
+  }else{
+    results<-rbind(temp_frame,results)
+  }
+}
+
+# tuned_radial<-tune(method=svm,closed_any~.,data=dropped_na_train,
+#                    ranges=list(cost=c(0.01, 0.1, 1,10,100),
+#                                class.weights=list(c("0"=1,"1"=20),
+#                                                   c("0"=1,"1"=10),
+#                                                   c("0"=1,"1"=30)),
+#                                gamma=c(.5,1,2)),
+#                    tunecontrol=tune.control(cross=3))
+# save(tuned_radial,file="tuned svm radial dropped.rData")
+# tuned_linear<-tune(method=svm,closed_any~.,data=dropped_na_train,
+#                    kernel="linear",
+#                    ranges=list(cost=c(0.01, 0.1, 1,10,100),
+#                                class.weights=list(c("0"=1,"1"=20),
+#                                                   c("0"=1,"1"=10),
+#                                                   c("0"=1,"1"=30)),
+#                                gamma=c(.5,1,2)),
+#                    tunecontrol=tune.control(cross=3))
+# save(tuned_linear,file="tuned svm linear dropped.rData")
+```
+
+
 
 ```{r tune_svm}
 #tune svm radial model
