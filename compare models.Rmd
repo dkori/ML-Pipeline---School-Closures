@@ -1,0 +1,373 @@
+---
+title: "KM_Models"
+author: "Katherine Minor"
+date: "December 5, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Load Libraries
+
+install.packages("tableone")
+install.packages("mice")
+install.packages("bnlearn")
+
+loadlibs = function(libs) {
+  for(lib in libs) {
+    class(lib)
+    if(!do.call(require,as.list(lib))) {install.packages(lib)}
+    do.call(require,as.list(lib))
+  }
+}
+libs = c("tidyr","imager","magrittr","purrr","dplyr","stringr","readr","data.table", "lubridate","keras","tidyverse","abind","reshape2","htmlTable","table1","tableone","rpart","mice","bnlearn")
+loadlibs(libs)
+
+
+```
+
+```{r}
+colnames(with_imputations)
+
+#removing 'state' and 'cd' due to high factor count. 
+
+data_km <- with_imputations[,-c(1:2)]
+colnames(data_km)
+```
+
+```{r}
+#count nas in data
+
+library(tidyverse)
+map(data_km,~sum(is.na(.)))
+
+#I have NAs in urban_locale_type.  I am going to drop them.
+
+data_km <- na.omit(data_km)
+
+map(data_km,~sum(is.na(.)))
+
+```
+
+```{r}
+#Check for factor and numeric.  Change 'character' data to factors.
+
+sapply(data_km,class)
+
+#kmdata %>% group_by(closed_any) %>% tally()
+data_km$closed_any = as.factor(data_km$closed_any)
+data_km$title1_status = as.factor(data_km$title1_status)
+data_km$magnet = as.factor(data_km$magnet)
+data_km$charter = as.factor(data_km$charter)
+data_km$shared = as.factor(data_km$shared)
+data_km$nslp_status = as.factor(data_km$nslp_status)
+
+sapply(data_km,class)
+
+```
+
+```{r}
+
+#Split data into test and train data
+set.seed(100)
+traini = sample(1:nrow(data_km))[1:floor(0.7*nrow(data_km))]
+train = data_km[traini,]
+test_ALL = data_km[-traini,]
+
+#validation set
+vali = sample(1:nrow(test_ALL))[1:floor((1/3)*nrow(test_ALL))]
+val_test = test_ALL[vali,]
+hold_out_test = test_ALL[-vali,]
+
+#Vector for confusion matrix
+closed_any.testALL = data_km$closed_any[-traini]
+closed_any.val = test_ALL$closed_any[vali]
+closed_any.hold_out_test = test_ALL$closed_any[-vali]
+
+#Count total number of 'closed_any' in data:
+
+data_km$closed_any %>% summary()
+
+#We have 5390 observations.
+
+#Check ratio of 'closed_any' across total, train, and test, validation and hold-out, data
+
+data_km$closed_any %>% summary()/nrow(data_km)
+#5.33% of total
+
+train$closed_any %>% summary()/nrow(train)
+#5.4 % of total
+
+test_ALL$closed_any %>% summary()/nrow(test_ALL)
+#5.517% of total.
+
+val_test$closed_any %>% summary()/nrow(val_test)
+#5.35%
+
+hold_out_test$closed_any %>% summary()/nrow(hold_out_test)
+#5.08%
+
+#code for oversampling
+
+install.packages("groupdata2")
+install.packages("caret")
+library(caret)
+library(groupdata2)
+#set.seed(100)
+
+upSampledTrain <-upsample(train, cat_col = "closed_any")
+
+dim(upSampledTrain)
+table(upSampledTrain$closed_any)
+
+#I have 66,941 now
+train <- upSampledTrain
+
+train$closed_any %>% summary()/nrow(train)
+#50% of total
+
+val_test$closed_any %>% summary()/nrow(val_test)
+#5.35% of total.
+
+
+
+```
+
+```{r}
+#Model training time
+
+#Logistic Regression
+
+lr = glm(closed_any~.,data = train, family = "binomial"(link = "logit"), subset = traini)
+lrp = predict(lr, val_test, type = "response") %>% tbl_df()
+
+lrp.view = predict(lr, val_test, type = "response")
+glm.pred = rep(0,nrow(lrp))
+glm.pred[lrp.view>.4]=1
+table(glm.pred, closed_any.val)
+
+```
+
+```{r}
+#Decision Tree
+dt = rpart(closed_any~., train)
+dtp = predict(dt, val_test)%>% as_tibble()%>%.[,2]%>%.[[1]]%>%tibble()
+```
+
+
+```{r}
+#Random Forest
+library(randomForest)
+
+rf = randomForest(closed_any~.,train)
+rfp = predict(rf, val_test, type = "prob")%>% .[,2]%>% tibble()
+
+rf_13 = randomForest(closed_any~.,train, mtry = 13)
+rf_5 = randomForest(closed_any~.,train, mtry = 5)
+rf_4 = randomForest(closed_any~.,train, mtry = 4)
+rf_3 = randomForest(closed_any~.,train, mtry = 3)
+
+#Tuning_13
+#rf_13 = randomForest(closed_any~.,train, mtry = 13)
+rfp_13 = predict(rf_13, val_test, type = "prob")%>%.[,2]%>%tibble()
+
+rf.predict_base = predict(rf, val_test)
+
+table(rf.predict_base,closed_any.val)
+
+rf.predict_13 = predict(rf_13, val_test)
+
+table(rf.predict_13,closed_any.val)
+
+#Tuning_5
+#rf_5 = randomForest(closed_any~.,train, mtry = 5)
+rfp_5 = predict(rf_5, val_test, type = "prob")%>%.[,2]%>%tibble()
+
+rf.predict_5 = predict(rf_5, val_test)
+
+table(rf.predict_5,closed_any.val)
+
+#Tuning_4
+#rf_4 = randomForest(closed_any~.,train, mtry = 4)
+rfp_4 = predict(rf_4, val_test, type = "prob")%>%.[,2]%>%tibble()
+
+rf.predict_4 = predict(rf_4, val_test)
+
+table(rf.predict_4,closed_any.val)
+
+#Tuning_3
+#rf_3 = randomForest(closed_any~.,train, mtry = 3)
+rfp_3 = predict(rf_3, val_test, type = "prob")%>%.[,2]%>%tibble()
+
+rf.predict_3 = predict(rf_3, val_test)
+
+table(rf.predict_3,closed_any.val)
+
+
+```
+
+```{r}
+#Gradient boost
+
+install.packages("gbm")
+install.packages("ada")
+
+library(gbm)
+library(ada)
+
+gbf = gbm(formula=closed_any~.,
+          data=train %>% mutate(closed_any = (as.character(closed_any) == "TRUE")),
+          interaction.depth=5)
+
+gbp = predict(gbf, val_test %>% mutate(closed_any = (as.character(closed_any) == "TRUE")),
+              n.trees = gbf$n.trees,
+              type="response") %>% tibble()
+
+#adf = ada(closed_any~., train)
+#adp = predict(adf, test, type="probs") %>% .[,2] %>% tibble()
+#These produce errors
+
+```
+
+
+```{r neural_net}
+library(dplyr)
+#load best neural net
+nn<-load_model_hdf5('base_modele.h5')
+
+#reload data, reformat to fit nn model
+load("for modeling.RData")
+with_imputations<-with_imputations%>%
+  #select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
+  #make closed_any a factor since SVM is a categorical classifier
+  mutate(closed_any=factor(closed_any))%>%
+  filter(!is.na(urban_locale_type))%>%
+  select(-c("state","cd"))
+#make character variables into factors
+for(var in names(with_imputations)){
+  temp_vector<-with_imputations[,var]
+  if(is.character(temp_vector[[1]])){
+    temp_vector[[1]]<-factor(temp_vector[[1]])
+  }
+  with_imputations[,var]<-temp_vector
+}
+
+#create a function that turns the factor variables into dummies
+create_dummies<-function(df){
+  cols<-colnames(df)
+  for(i in 1:length(cols)){
+    col<-cols[i]
+    temp_frame<-df[,i]
+    #test if the column is a character
+    if(is.factor(temp_frame[[col]])){
+      #create a model matrix of binaries for each category of the character variable
+      names(temp_frame)<-"binary"
+      temp_frame2<-data.frame(model.matrix(~binary,data=temp_frame))[-1]
+      colnames(temp_frame2)<-gsub("binary",col,colnames(temp_frame2))
+    }else{
+      #if not character, just keep it the same
+      temp_frame2<-temp_frame
+    }
+    if(i==1){
+      #we don't want to replace the first column, quick way to skip it
+      result_frame<-temp_frame2
+    }else{
+      result_frame<-cbind(result_frame,temp_frame2)
+    }
+  }
+  result_frame
+}
+
+#apply create_dummies function to everything but closed_any
+with_imputations_wide<-create_dummies(with_imputations)
+val_test_wide<-with_imputations_wide[vali,]
+val_testy<-val_test_wide%>%select(closed_any1)%>%as.matrix()
+val_testx<-val_test_wide%>%select(-closed_any1)%>%as.matrix()
+
+nnp<-predict(nn,batch_size=64,val_testx)
+
+```
+
+
+```{r}
+#Attempt at the ROC Curve
+library(ggplot2)
+library(ROCR)
+
+
+make_performance = function(guess, truth, y="prec", x="rec") {
+  prediction(guess, truth) %>% performance(y,x)
+}
+
+roc = list()
+roc$lr = make_performance(lrp$value, val_test$closed_any)
+roc$dt = make_performance(dtp$., val_test$closed_any)
+#roc$rf = make_performance(rfp$., val_test$closed_any)
+roc$gbm = make_performance(gbp$., val_test$closed_any)
+roc$nn = make_performance(nnp,val_testy)
+#roc$ada = make_performance(adp$., test_i$dod)
+
+
+
+auc = list()
+auc$lr = prediction(lrp$value, val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+auc$dt = prediction(dtp$., val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+# f1_scores$rf = prediction(rfp$., val_test$closed_any) %>% performance("f") %>% .@y.values %>% .[[1]] %>% round(2)
+# auc$gbm = prediction(gbp$., val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+auc$nn = prediction(nnp, val_testy) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+#auc$ada = prediction(adp$., test_i$dod) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+
+df_for_gg = function(perf) {
+  df = data.frame(y=perf@y.values[[1]],
+                  x=perf@x.values[[1]])
+  df
+}
+
+my_ggplot = function(roc) {
+  g = ggplot(data=df_for_gg(roc$lr), aes(x=x,y=y,color=paste("LR", auc$lr))) +
+    geom_line() +
+    geom_line(data=df_for_gg(roc$dt),aes(color=paste("DT", auc$dt))) +
+    # geom_line(data=df_for_gg(roc$rf),aes(color=paste("RF", f1_scores$rf))) +
+    #geom_line(data=df_for_gg(roc$gbm),aes(color=paste("GBM", auc$gbm))) +
+    geom_line(data=df_for_gg(roc$nn),aes(color=paste("NN",auc$nn)))+
+    xlab(roc$lr@x.name) + ylab(roc$lr@y.name) + labs(color="Method and Area Under ROC")
+  g
+}
+my_ggplot(roc)
+
+  #geom_line(data=df_for_gg(roc$ada),aes(color=paste("ADA", auc$ada))) +
+
+```
+
+```{r}
+#QDA Model
+library(MASS)
+qda.fit2 = qda(closed_any~total_students + teachers + white + free_lunch_students,train) 
+qda.predict = predict(qda.fit2, val_test)$class
+table(qda.predict, closed_any.val)
+#QDA IS REALLY BAD!  :?
+
+
+```
+
+```{r}
+#Random Forest seems to be performing the best
+#Need to get probabilities and do something with that.
+rf.predict = predict(rf, test)
+
+table(rf.predict,closed_any.test)
+
+varImpPlot(rf,  
+           sort = T,
+           n.var=15,
+           main="Variable Importance")
+```
+```{r}
+#tuning Random forest
+
+
+```
+

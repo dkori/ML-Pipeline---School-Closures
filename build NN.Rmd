@@ -22,7 +22,6 @@ library(ROCR)
 
 ```{r load_data,echo=FALSE}
 load("for modeling.RData")
-
 #to avoid adding too much dimensionality, only keep percent variables for race and lunch
 # dropped_nas<-dropped_nas%>%
 #   select(-c(american_indian,asian,hisp,black,white,pacific_islander,multi_racial,ln_stud_teacher_ratio))%>%
@@ -185,6 +184,134 @@ table(ifelse(as.numeric(paste0(preds1))>.075,1,0),
 base_density
 ```
 
+
+```{r early_stopping_model}
+#recreate a base model 
+base_model=keras_model_sequential()
+l1=1e-2
+
+base_model%>%
+  layer_dense(units=32,activation="relu",kernel_regularizer=regularizer_l1(l1),
+              input_shape=ncol(xtrain))%>%
+  #layer_dense(units=32,activation="relu",kernel_regularizer=regularizer_l1(l1))%>%
+  #layer_dense(units=32,activation="tanh",kernel_regularizer=regularizer_l1(l1))%>%
+
+  layer_dense(units=32,activation="relu",kernel_regularizer=regularizer_l1(l1))%>%
+  layer_dense(units=1,activation="sigmoid",kernel_regularizer=regularizer_l1(l1))
+summary(base_model)
+
+#compile base model, binary_crossentropy is appropriate for classification task
+base_model%>%compile(
+  loss='binary_crossentropy',
+  optimizer=optimizer_adam(),
+  metrics=c('mae')
+)
+
+
+### Train model
+inner_epochs = 50
+early_stopping = callback_early_stopping(monitor = "val_loss",
+                                         patience = inner_epochs/5)
+bestLoss = 100
+for(i in 1:20) {
+  history = base_model %>% fit(xtrain,ytrain,
+                       epochs=inner_epochs,
+                       callbacks = c(early_stopping),
+                       batch_size=64,
+                       validation_split=0.2,
+                       #define class_weights to account for rarity of school closures
+                       class_weights=c("0"=1,"1"=23),
+                       shuffle=T)
+  
+  loss = history$metrics$val_loss[length(history$metrics$val_loss)]
+  if(loss < bestLoss) {
+    bestLoss = loss
+    base_model %>% save_model_weights_hdf5("early_stopping/my_model_weights2.h5")
+  }
+}
+loss
+### Plot performance 
+plot(history, metrics = "loss")  # only plots the last part of training
+
+### Load the early-stopping model
+bestModel = base_model %>% load_model_weights_hdf5('early_stopping/my_model_weights.h5')
+bestModel %>% compile(
+  # loss = 'categorical_crossentropy',
+  loss = 'mae',
+  optimizer = optimizer_nadam(),
+  metrics = c('mae')
+)
+
+
+preds<-predict(bestModel,batch_size = 64, x=xtest)
+
+prediction_matrix<-table(preds,ytest)%>%as.data.frame
+ft_auc=prediction(preds,ytest)%>%
+  performance("auc")%>%.@y.values%>%.[[1]]
+
+prediction(preds,ytest)%>%
+  performance(measure="tpr",x.measure="fpr")%>%plot()
+
+base_density<-prediction_matrix%>%
+  uncount(Freq)%>%
+  mutate(preds=as.numeric(paste0(preds)))%>%
+  ggplot(aes(x=preds,colour=ytest,fill=ytest))+
+  geom_density(alpha=.5)
+base_density
+base_density2
+
+#evaluate best early_stopping model against model e from previous chunk
+mod1<-base_model %>% load_model_weights_hdf5('early_stopping/my_model_weights.h5')
+rm(mod2)
+mod2<-load_model_hdf5('base_modele.h5')
+
+
+
+#generate predictions for each
+preds1<-predict(mod1,batch_size = 64, x=xtest)
+preds2<-predict(mod2,batch_size = 64, x=xtest)
+
+prediction_matrix1<-table(preds1,ytest)%>%as.data.frame
+prediction_matrix2<-table(preds2,ytest)%>%as.data.frame
+
+base_density1<-prediction_matrix1%>%
+  uncount(Freq)%>%
+  mutate(preds=as.numeric(paste0(preds1)))%>%
+  ggplot(aes(x=preds,colour=ytest,fill=ytest))+
+  geom_density(alpha=.5)
+
+base_density2<-prediction_matrix2%>%
+  uncount(Freq)%>%
+  mutate(preds=as.numeric(paste0(preds2)))%>%
+  ggplot(aes(x=preds,colour=ytest,fill=ytest))+
+  geom_density(alpha=.5)
+
+base_density1
+base_density2
+
+evaluate1<-prediction(preds1,ytest)
+evaluate2<-prediction(preds2,ytest)
+
+RP.perf1 <- performance(evaluate1, "prec", "rec")
+RP.perf2 <- performance(evaluate2, "prec", "rec")
+
+f1_1<-performance(evaluate1,"f")
+f1_2<-performance(evaluate2,"f")
+
+for_plot<-data.frame(Recall= RP.perf1@x.values%>%unlist,
+                     Precision= RP.perf1@y.values%>%unlist,
+                     Mod="Mod1")%>%
+  rbind(data.frame(Recall= RP.perf2@x.values%>%unlist,
+                     Precision= RP.perf2@y.values%>%unlist,
+                     Mod="Mod2"))
+
+for_plot%>%
+  ggplot(aes(x=Recall,y=Precision,color=Mod))+geom_line()
+
+
+
+```
+`The original model (non-early stopping trained) outperforms the early-stopping trained model at higher levels of recall.`
 
 ```{r fine_tune}
 # predictions<-base_model$output%>%
