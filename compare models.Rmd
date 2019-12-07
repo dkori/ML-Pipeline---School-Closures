@@ -296,8 +296,14 @@ nnp<-predict(nn,batch_size=64,val_testx)
 #Attempt at the ROC Curve
 library(ggplot2)
 library(ROCR)
-
-
+#load glm
+load("glm.Rdata")
+#load qda, fp, and lp
+load("lp_KM predictions.rdata")
+load("qda_KM predictions.rdata")
+load("rfp_KM predictions.rdata")
+# print(load("rfp_KM predictions.rdata"))
+# print(load("qda_KM predictions.rdata"))
 make_performance = function(guess, truth, y="prec", x="rec") {
   prediction(guess, truth) %>% performance(y,x)
 }
@@ -306,11 +312,13 @@ roc = list()
 roc$lr = make_performance(lrp$value, val_test$closed_any)
 roc$dt = make_performance(dtp$., val_test$closed_any)
 #roc$rf = make_performance(rfp$., val_test$closed_any)
-roc$gbm = make_performance(gbp$., val_test$closed_any)
+# roc$gbm = make_performance(gbp$., val_test$closed_any)
 roc$nn = make_performance(nnp,val_testy)
+roc$glm = make_performance(glm_base_p,validation$closed_any)
+roc$glm_os = make_performance(glm_os_p,validation$closed_any)
 #roc$ada = make_performance(adp$., test_i$dod)
-
-
+roc$rf = make_performance(rfp_4,val_test$closed_any)
+roc$qda = make_performance(qdap$posterior[,1],as.numeric(val_test$closed_any))
 
 auc = list()
 auc$lr = prediction(lrp$value, val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
@@ -318,6 +326,10 @@ auc$dt = prediction(dtp$., val_test$closed_any) %>% performance("auc") %>% .@y.v
 # f1_scores$rf = prediction(rfp$., val_test$closed_any) %>% performance("f") %>% .@y.values %>% .[[1]] %>% round(2)
 # auc$gbm = prediction(gbp$., val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
 auc$nn = prediction(nnp, val_testy) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+auc$glm = prediction(glm_base_p, validation$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+auc$glm_os = prediction(glm_os_p, validation$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+auc$rf = prediction(rfp_4,val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
+auc$qda = prediction(qdap$posterior[,1],val_test$closed_any) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
 #auc$ada = prediction(adp$., test_i$dod) %>% performance("auc") %>% .@y.values %>% .[[1]] %>% round(2)
 
 df_for_gg = function(perf) {
@@ -329,11 +341,16 @@ df_for_gg = function(perf) {
 my_ggplot = function(roc) {
   g = ggplot(data=df_for_gg(roc$lr), aes(x=x,y=y,color=paste("LR", auc$lr))) +
     geom_line() +
-    geom_line(data=df_for_gg(roc$dt),aes(color=paste("DT", auc$dt))) +
+    #geom_line(data=df_for_gg(roc$dt),aes(color=paste("DT", auc$dt))) +
     # geom_line(data=df_for_gg(roc$rf),aes(color=paste("RF", f1_scores$rf))) +
     #geom_line(data=df_for_gg(roc$gbm),aes(color=paste("GBM", auc$gbm))) +
     geom_line(data=df_for_gg(roc$nn),aes(color=paste("NN",auc$nn)))+
-    xlab(roc$lr@x.name) + ylab(roc$lr@y.name) + labs(color="Method and Area Under ROC")
+    #geom_line(data=df_for_gg(roc$glm),aes(color=paste("GLM",auc$glm)))+
+    geom_line(data=df_for_gg(roc$glm_os),aes(color=paste("LR - oversampled",auc$glm_os)))+
+    geom_line(data=df_for_gg(roc$rf),aes(color=paste("RF",auc$rf)))+
+    geom_line(data=df_for_gg(roc$qda),aes(color=paste("QDA",auc$qda)))+
+    xlab(roc$lr@x.name) + ylab(roc$lr@y.name) + labs(color="Method and Area Under ROC")+
+    ylim(0,.6)
   g
 }
 my_ggplot(roc)

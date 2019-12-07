@@ -1,0 +1,41 @@
+---
+title: "summary stats"
+author: "Devraj Kori"
+date: "12/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
+library(scales)
+```
+
+
+```{r sum_stats}
+load("for modeling.RData")
+names(with_imputations)
+summary_stats<-with_imputations%>%
+  group_by(closed_any)%>%
+  summarise("Number of Schools"=comma(n()),
+    "Missing Teacher"=mean(missing_teacher)%>%percent(),
+            "Not Applicable Teacher" = mean(na_teacher)%>%percent(),
+            "% Charter" = percent(mean(charter=="1")),
+            "% Magnet" = percent(mean(magnet=="1")),
+            "% Free Lunch" = percent(mean(freelunch_perc)),
+            "% Reduced Lunch" = percent(mean(reducedlunch_perc)),
+            "% Black" = percent(mean(black_perc)),
+            "% White" = percent(mean(white_perc)),
+            "% Hispanic" = percent(mean(hisp_perc)),
+            "% Native American" = percent(mean(amerind_perc)),
+            "% Pacific Islander" = percent(mean(pacif_perc)),
+            "% Asian" = percent(mean(asian_perc)))%>%
+  t()%>%as.data.frame()
+
+
+names(summary_stats)<-c("Remained Open", "Closed")
+
+kable(summary_stats,format="latex",row.names=TRUE)
+
+```

@@ -31,6 +31,7 @@ library(caret)
 
 #Feature engineeering: 
 ```{r setup, include=FALSE}
+
 knitr::opts_chunk$set(echo = TRUE)
 #SG:Addtions
 #load("for modeling.Rdata")
@@ -185,6 +186,10 @@ auc(rocBase)
 
 plot(rocBase, legacy.axes =TRUE)
 
+
+glm_base_p<-predict(glm.fits_closed, validation,type="response")
+
+validation$closed_any
 ```
 ###Results of log/reg shows that class 0 or "not closed" is predicted well and the accuracy is high, but...
 The prediction accuracy is: 95.9% due to high imbalanced class of 0s, sensitity of 0%, high specificity of 95%
@@ -229,6 +234,8 @@ coef(summary(glm.fits_closedOS))
 
 #on validation set
 glm.probs_valOS =predict(glm.fits_closedOS, validation, type="response")
+glm_os_p<-predict(glm.fits_closedOS, validation, type="response")
+
 
 glm.pred_valOS = rep(0, nrow(validation))
 glm.pred_valOS[glm.probs_valOS >.5]= 1
@@ -354,9 +361,15 @@ library(mda)
 # Fit the model
 fda.Fit <- fda(closed_any~., data = upSampledTrain)
 # Make predictions
-predicted.classes <- fda.Fit %>% predict(test)
+predicted.classes <- fda.Fit %>% predict(validation,type=)
+
+#save predictions from all models
+
+save(glm_base_p,glm_os_p,validation,file="glm.Rdata")
 # Model accuracy
 mean(predicted.classes == test$closed_any)
+
+
 
 #Factor for the table: Confusion matrix with full metrics FDA
 confusionMatrix(table(test$closed_any, predicted.classes), positive ='1')
