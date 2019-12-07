@@ -91,6 +91,8 @@ xtest<-test%>%select(-c("closed_any1"))%>%as.matrix()
 ytrain<-train[,"closed_any1"]%>%as.matrix()
 ytest<-test[,"closed_any1"]%>%as.matrix()
 
+xall<-with_imputations_wide%>%select(-c("closed_any1"))%>%as.matrix()
+yall<-with_imputations_wide[,"closed_any1"]%>%as.matrix()
 
 ```
 
@@ -312,6 +314,32 @@ for_plot%>%
 
 ```
 `The original model (non-early stopping trained) outperforms the early-stopping trained model at higher levels of recall.`
+
+
+```{r density_all}
+
+preds2<-predict(nn, batch_size = 64, x=xall)
+
+prediction_matrix2<-table(preds2,yall)%>%as.data.frame
+
+
+
+base_density2<-prediction_matrix2%>%
+  uncount(Freq)%>%
+  mutate(preds2=as.numeric(paste0(preds2)))%>%
+  ggplot(aes(x=preds2,colour=yall,fill=yall))+
+  geom_density(alpha=.5)+
+  labs(fill="Actual closure outcome",colour="Actual closure outcome",
+       x="predicted")+theme(legend.position="bottom")
+
+
+base_density2
+
+
+table("predictions"=ifelse(preds2>=.05,1,0),"actual"=yall)%>%
+  kable(format="latex",caption="Table 2: confusion matrix of predictions")
+
+```
 
 ```{r fine_tune}
 # predictions<-base_model$output%>%
